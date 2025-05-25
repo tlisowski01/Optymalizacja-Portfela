@@ -12,7 +12,7 @@ st.set_page_config(layout="wide")
 
 st.title("📈 AI Optymalizacja Portfela - Spółki WIG20")
 
-# Lista spółek WIG20 z tickerami na Yahoo Finance (odpowiedniki dla Stooq nie działają z yfinance)
+# Updated list of WIG20 companies with correct Yahoo Finance tickers
 wig20_tickers = {
     "PKN Orlen": "PKN.WA",
     "PKO BP": "PKO.WA",
@@ -36,65 +36,76 @@ wig20_tickers = {
     "PGE": "PGE.WA"
 }
 
-# Użytkownik wybiera spółki
+# User selects stocks
 selected_stocks = st.multiselect("Wybierz spółki z WIG20:", list(wig20_tickers.keys()))
 
-# Zakres dat
+# Date range
 end_date = datetime.today()
-start_date = end_date - timedelta(days=3 * 365)
+start_date = end_date - timedelta(days=3*365)
 
-# Pobieranie danych
+# Download data function
 @st.cache_data
 def download_data(tickers):
     data = {}
     for name in tickers:
         ticker = wig20_tickers[name]
-        df = yf.download(ticker, start=start_date, end=end_date)["Adj Close"]
-        df.name = name
-        data[name] = df
-    return pd.concat(data.values(), axis=1)
+        try:
+            df = yf.download(ticker, start=start_date, end=end_date, progress=False)
+            if not df.empty:
+                data[name] = df['Adj Close']
+            else:
+                st.warning(f"Nie udało się pobrać danych dla {name} ({ticker})")
+        except Exception as e:
+            st.error(f"Błąd podczas pobierania danych dla {name} ({ticker}): {str(e)}")
+    if data:
+        return pd.DataFrame(data)
+    return None
 
 if selected_stocks:
     st.info("Pobieranie danych...")
     prices = download_data(selected_stocks)
-    st.success("Dane pobrane!")
-
-    # Wyświetlenie wykresu cen
-    st.line_chart(prices)
-
-    # Obliczanie dziennych zwrotów
-    returns = prices.pct_change().dropna()
-
-    st.subheader("🔍 Optymalizacja portfela (AI)")
-
-    # Przygotowanie danych do AI
-    X = returns.copy()
-    y = returns.mean(axis=1)  # sztuczna metryka do regresji
-
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-
-    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
-
-    model = RandomForestRegressor(n_estimators=100, random_state=42)
-    model.fit(X_train, y_train)
-
-    importances = model.feature_importances_
-    weights = importances / importances.sum()
-
-    # Wyświetlenie wag
-    st.write("🔢 Proponowane wagi portfela:")
-    weights_df = pd.DataFrame({
-        "Spółka": selected_stocks,
-        "Waga (%)": (weights * 100).round(2)
-    }).sort_values("Waga (%)", ascending=False)
-    st.dataframe(weights_df, use_container_width=True)
-
-    # Wizualizacja portfela
-    fig, ax = plt.subplots()
-    ax.pie(weights, labels=selected_stocks, autopct="%1.1f%%", startangle=90)
-    ax.axis("equal")
-    st.pyplot(fig)
-
+    
+    if prices is not None and not prices.empty:
+        st.success("Dane pobrane pomyślnie!")
+        
+        # Display price chart
+        st.subheader("📊 Wykres cen")
+        st.line_chart(prices)
+        
+        # Calculate daily returns
+        returns = prices.pct_change().dropna()
+        
+        st.subheader("🔍 Optymalizacja portfela (AI)")
+        
+        # Prepare data for AI
+        X = returns.copy()
+        y = returns.mean(axis=1)  # artificial metric for regression
+        
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
+        
+        X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+        
+        model = RandomForestRegressor(n_estimators=100, random_state=42)
+        model.fit(X_train, y_train)
+        
+        importances = model.feature_importances_
+        weights = importances / importances.sum()
+        
+        # Display weights
+        st.write("🔢 Proponowane wagi portfela:")
+        weights_df = pd.DataFrame({
+            "Spółka": selected_stocks,
+            "Waga (%)": (weights * 100).round(2)
+        }).sort_values("Waga (%)", ascending=False)
+        st.dataframe(weights_df, use_container_width=True)
+        
+        # Portfolio visualization
+        fig, ax = plt.subplots()
+        ax.pie(weights, labels=selected_stocks, autopct="%1.1f%%", startangle=90)
+        ax.axis("equal")
+        st.pyplot(fig)
+    else:
+        st.error("Nie udało się pobrać danych dla wybranych spółek. Spróbuj ponownie.")
 else:
     st.warning("Wybierz przynajmniej jedną spółkę.")
