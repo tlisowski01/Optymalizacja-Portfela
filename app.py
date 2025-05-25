@@ -50,13 +50,20 @@ def download_data(tickers):
     for name in tickers:
         ticker = wig20_tickers[name]
         try:
-            df = yf.download(ticker, start=start_date, end=end_date, progress=False)
-            if not df.empty:
-                data[name] = df['Adj Close']
-            else:
-                st.warning(f"Nie udało się pobrać danych dla {name} ({ticker})")
+            # Pobieramy pełne dane
+            stock_data = yf.download(ticker, start=start_date, end=end_date, progress=False)
+            
+            if stock_data.empty:
+                st.warning(f"Brak danych dla {name} ({ticker})")
+                continue
+                
+            # Zapisujemy tylko dane o zamknięciu
+            data[name] = stock_data['Adj Close']
+            
         except Exception as e:
-            st.error(f"Błąd podczas pobierania danych dla {name} ({ticker}): {str(e)}")
+            st.error(f"Błąd podczas pobierania {name} ({ticker}): {str(e)}")
+            continue
+    
     if data:
         return pd.DataFrame(data)
     return None
