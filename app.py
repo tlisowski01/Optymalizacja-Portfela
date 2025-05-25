@@ -7,6 +7,9 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
+import pandas_datareader.data as web
+
+
 
 st.set_page_config(layout="wide")
 
@@ -14,27 +17,38 @@ st.title("📈 AI Optymalizacja Portfela - Spółki WIG20")
 
 # Lista spółek WIG20 z tickerami na Yahoo Finance (odpowiedniki dla Stooq nie działają z yfinance)
 wig20_tickers = {
-    "PKN Orlen": "PKN.OL",
-    "PKO BP": "PKO.WA",
-    "PZU": "PZU.WA",
-    "KGHM": "KGH.WA",
-    "Santander Bank Polska": "SPL.WA",
-    "LPP": "LPP.WA",
-    "CD Projekt": "CDR.WA",
-    "Dino": "DNP.WA",
-    "Allegro": "ALE.WA",
-    "CCC": "CCC.WA",
-    "Cyfrowy Polsat": "CPS.WA",
-    "JSW": "JSW.WA",
-    "mBank": "MBK.WA",
-    "Orange Polska": "OPL.WA",
-    "Pepco": "PCO.WA",
-    "Grupa Kęty": "KTY.WA",
-    "Alior Bank": "ALR.WA",
-    "Asseco Poland": "ACP.WA",
-    "Tauron": "TPE.WA",
-    "PGE": "PGE.WA"
+    "PKN Orlen": "PKN",
+    "PKO BP": "PKO",
+    "PZU": "PZU",
+    "KGHM": "KGH",
+    "Santander": "SPL",
+    "CD Projekt": "CDR",
+    "JSW": "JSW",
+    "PGE": "PGE",
+    "Tauron": "TPE",
+    "Cyfrowy Polsat": "CPS",
+    "LPP": "LPP",
+    "Alior Bank": "ALR",
+    "Asseco Poland": "ACP",
+    "mBank": "MBK",
+    "Orange": "OPL",
+    "Dino": "DNP",
+    "CCC": "CCC",
+    "Pepco": "PCO",
+    "Grupa Kęty": "KTY",
+    "Allegro": "ALE"
 }
+
+
+def get_stooq_data(ticker, start, end):
+    try:
+        df = web.DataReader(f"{ticker}.WA", 'stooq', start, end)
+        df = df[::-1]  # Odwróć, bo Stooq zwraca dane od najnowszych do najstarszych
+        return df["Close"]  # lub 'Open', 'Low', 'High', jak wolisz
+    except Exception as e:
+        st.error(f"❌ Błąd pobierania danych dla {ticker}: {e}")
+        return None
+
 
 # Użytkownik wybiera spółki
 selected_stocks = st.multiselect("Wybierz spółki z WIG20:", list(wig20_tickers.keys()))
@@ -49,10 +63,12 @@ def download_data(tickers):
     data = {}
     for name in tickers:
         ticker = wig20_tickers[name]
-        df = yf.download(ticker, start=start_date, end=end_date)["Adj Close"]
-        df.name = name
-        data[name] = df
+        df = get_stooq_data(ticker, start_date, end_date)
+        if df is not None:
+            df.name = name
+            data[name] = df
     return pd.concat(data.values(), axis=1)
+
 
 if selected_stocks:
     st.info("Pobieranie danych...")
